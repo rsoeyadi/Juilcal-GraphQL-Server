@@ -48,7 +48,9 @@ const typeDefs = `
       tags: [String],
       titleContains: String,
       venueContains: String,
-      sort: EventSortInput
+      sort: EventSortInput,
+      limit: Int,         
+      offset: Int
     ): [Event]
 
     uniqueTags: [String]
@@ -69,6 +71,8 @@ const resolvers = {
         titleContains,
         venueContains,
         sort,
+        limit,
+        offset,
       }
     ) => {
       const connection = await connectToDatabase();
@@ -131,9 +135,21 @@ const resolvers = {
             sort.order && sort.order.toUpperCase() === "DESC" ? "DESC" : "ASC";
           query += ` ORDER BY ${mysql.escapeId(sort.field)} ${sortOrder}`;
         }
+
+        if (typeof limit === "number" && limit > 0) {
+          query += " LIMIT ?";
+          params.push(`${limit}`);
+        }
+
+        if (typeof offset === "number" && offset > 0) {
+          query += " OFFSET ?";
+          params.push(`${offset}`);
+        }
+
         const [rows] = await connection.execute(query, params);
         return rows;
       } catch (error) {
+        console.error("Error executing query:", error);
         throw new Error("Failed to fetch events");
       } finally {
         await connection.end();
@@ -145,16 +161,10 @@ const resolvers = {
       try {
         const query = "SELECT tags FROM events";
         const [rows] = await connection.execute(query);
-
-        // Assert that rows is of type RowDataPacket[]
         const rowDataPackets = rows as mysql.RowDataPacket[];
-
-        // Flatten the array of tag strings into a single array of tags
         const allTags = rowDataPackets.flatMap((row) =>
           row.tags.split(",").map((tag) => tag.trim().toLowerCase())
         );
-
-        // Create a Set to remove duplicates and convert it back to an array
         const uniqueTags = Array.from(new Set(allTags));
         return uniqueTags;
       } catch (error) {
@@ -167,7 +177,6 @@ const resolvers = {
 };
 
 const server = new ApolloServer({ typeDefs, resolvers });
-
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
 startStandaloneServer(server, {

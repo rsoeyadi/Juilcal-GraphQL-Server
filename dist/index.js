@@ -42,7 +42,9 @@ const typeDefs = `
       tags: [String],
       titleContains: String,
       venueContains: String,
-      sort: EventSortInput
+      sort: EventSortInput,
+      limit: Int,         
+      offset: Int
     ): [Event]
 
     uniqueTags: [String]
@@ -50,7 +52,7 @@ const typeDefs = `
 `;
 const resolvers = {
     Query: {
-        events: async (_, { startDate, endDate, dayOfWeek, timeOfDayBefore, timeOfDayAfter, tags, titleContains, venueContains, sort, }) => {
+        events: async (_, { startDate, endDate, dayOfWeek, timeOfDayBefore, timeOfDayAfter, tags, titleContains, venueContains, sort, limit, offset, }) => {
             const connection = await connectToDatabase();
             try {
                 let query = "SELECT * FROM events WHERE 1=1";
@@ -99,10 +101,21 @@ const resolvers = {
                     const sortOrder = sort.order && sort.order.toUpperCase() === "DESC" ? "DESC" : "ASC";
                     query += ` ORDER BY ${mysql.escapeId(sort.field)} ${sortOrder}`;
                 }
+                if (typeof limit === "number" && limit > 0) {
+                    query += " LIMIT ?";
+                    params.push(`${limit}`);
+                }
+                if (typeof offset === "number" && offset > 0) {
+                    query += " OFFSET ?";
+                    params.push(`${offset}`);
+                }
+                console.log(query, params);
+                console.log("Params:", params.map((p) => typeof p));
                 const [rows] = await connection.execute(query, params);
                 return rows;
             }
             catch (error) {
+                console.error("Error executing query:", error);
                 throw new Error("Failed to fetch events");
             }
             finally {
@@ -114,11 +127,8 @@ const resolvers = {
             try {
                 const query = "SELECT tags FROM events";
                 const [rows] = await connection.execute(query);
-                // Assert that rows is of type RowDataPacket[]
                 const rowDataPackets = rows;
-                // Flatten the array of tag strings into a single array of tags
                 const allTags = rowDataPackets.flatMap((row) => row.tags.split(",").map((tag) => tag.trim().toLowerCase()));
-                // Create a Set to remove duplicates and convert it back to an array
                 const uniqueTags = Array.from(new Set(allTags));
                 return uniqueTags;
             }
@@ -132,8 +142,9 @@ const resolvers = {
     },
 };
 const server = new ApolloServer({ typeDefs, resolvers });
+const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 startStandaloneServer(server, {
-    listen: { port: 4000 },
+    listen: { port: PORT }, // Listen on the dynamically assigned Heroku port
 }).then(({ url }) => {
     console.log(`🚀 Server ready at ${url}`);
 });
