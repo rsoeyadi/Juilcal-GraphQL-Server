@@ -168,8 +168,10 @@ const resolvers = {
 
 const server = new ApolloServer({ typeDefs, resolvers });
 
+const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
+
 startStandaloneServer(server, {
-  listen: { port: 4000 },
+  listen: { port: PORT }, // Listen on the dynamically assigned Heroku port
 }).then(({ url }) => {
   console.log(`🚀 Server ready at ${url}`);
 });
