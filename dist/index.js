@@ -28,17 +28,20 @@ const typeDefs = `
   }
 
   input EventSortInput {
-  field: String
-  order: String
+    field: String
+    order: String
   }
 
   type Query {
     events(
+      startDate: String,
+      endDate: String,
       dayOfWeek: String,
-      timeBefore: String,
-      timeAfter: String,
+      timeOfDayBefore: String,
+      timeOfDayAfter: String,
       tags: [String],
       titleContains: String,
+      venueContains: String,
       sort: EventSortInput
     ): [Event]
 
@@ -47,7 +50,7 @@ const typeDefs = `
 `;
 const resolvers = {
     Query: {
-        events: async (_, { dayOfWeek, timeBefore, timeAfter, tags, titleContains, sort }) => {
+        events: async (_, { startDate, endDate, dayOfWeek, timeOfDayBefore, timeOfDayAfter, tags, titleContains, venueContains, sort, }) => {
             const connection = await connectToDatabase();
             try {
                 let query = "SELECT * FROM events WHERE 1=1";
@@ -56,17 +59,29 @@ const resolvers = {
                     query += " AND title LIKE ?";
                     params.push(`%${titleContains}%`);
                 }
+                if (startDate) {
+                    query += " AND DATE(date_time) >= ?";
+                    params.push(startDate);
+                }
+                if (endDate) {
+                    query += " AND DATE(date_time) <= ?";
+                    params.push(endDate);
+                }
                 if (dayOfWeek) {
                     query += " AND DAYNAME(date_time) = ?";
                     params.push(dayOfWeek);
                 }
-                if (timeBefore) {
+                if (timeOfDayBefore) {
                     query += " AND TIME(date_time) <= ?";
-                    params.push(timeBefore);
+                    params.push(timeOfDayBefore);
                 }
-                if (timeAfter) {
+                if (timeOfDayAfter) {
                     query += " AND TIME(date_time) >= ?";
-                    params.push(timeAfter);
+                    params.push(timeOfDayAfter);
+                }
+                if (venueContains) {
+                    query += " AND venue LIKE ?";
+                    params.push(`%${venueContains}%`);
                 }
                 if (tags && tags.length > 0) {
                     // Convert both database tags and input tags to lowercase for case-insensitive comparison
