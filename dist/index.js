@@ -28,6 +28,10 @@ const typeDefs = `
     last_updated: String
   }
 
+  type Venue {
+    venue: String
+  }
+
   input EventSortInput {
     field: String
     order: String
@@ -51,6 +55,8 @@ const typeDefs = `
     uniqueTags: [String]
 
     lastUpdated: String
+
+    distinctVenues: [Venue]
   }
 `;
 const resolvers = {
@@ -135,6 +141,21 @@ const resolvers = {
             }
             catch (error) {
                 throw new Error("Failed to fetch unique tags");
+            }
+            finally {
+                await connection.end();
+            }
+        },
+        distinctVenues: async () => {
+            const connection = await connectToDatabase();
+            try {
+                const query = "SELECT DISTINCT venue FROM events";
+                const [rows] = (await connection.execute(query));
+                return rows.map((row) => ({ venue: row.venue }));
+            }
+            catch (error) {
+                console.error("Error executing query:", error);
+                throw new Error("Failed to fetch distinct venues");
             }
             finally {
                 await connection.end();
