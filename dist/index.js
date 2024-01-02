@@ -25,6 +25,7 @@ const typeDefs = `
     venue: String
     link: String
     tags: String
+    last_updated: String
   }
 
   input EventSortInput {
@@ -48,6 +49,8 @@ const typeDefs = `
     ): [Event]
 
     uniqueTags: [String]
+
+    lastUpdated: String
   }
 `;
 const resolvers = {
@@ -109,8 +112,6 @@ const resolvers = {
                     query += " OFFSET ?";
                     params.push(`${offset}`);
                 }
-                console.log(query, params);
-                console.log("Params:", params.map((p) => typeof p));
                 const [rows] = await connection.execute(query, params);
                 return rows;
             }
@@ -134,6 +135,24 @@ const resolvers = {
             }
             catch (error) {
                 throw new Error("Failed to fetch unique tags");
+            }
+            finally {
+                await connection.end();
+            }
+        },
+        lastUpdated: async () => {
+            const connection = await connectToDatabase();
+            try {
+                const query = "SELECT MAX(last_updated) AS last_updated FROM events";
+                const [rows] = (await connection.execute(query));
+                if (rows.length > 0) {
+                    return rows[0].last_updated;
+                }
+                return null;
+            }
+            catch (error) {
+                console.error("Error fetching last_updated:", error);
+                throw new Error("Failed to fetch last_updated");
             }
             finally {
                 await connection.end();
