@@ -28,6 +28,11 @@ const typeDefs = `
     last_updated: String
   }
 
+  type EventsWithCount {
+    events: [Event]
+    totalCount: Int
+  }
+
   type Venue {
     venue: String
   }
@@ -51,6 +56,20 @@ const typeDefs = `
       limit: Int,         
       offset: Int
     ): [Event]
+
+    eventsWithPagination(
+      startDate: String,
+      endDate: String,
+      dayOfWeek: String,
+      timeOfDayBefore: String,
+      timeOfDayAfter: String,
+      tags: [String],
+      titleContains: String,
+      venueContains: String,
+      sort: EventSortInput,
+      limit: Int,         
+      offset: Int
+    ): EventsWithCount
 
     uniqueTags: [String]
 
@@ -120,6 +139,81 @@ const resolvers = {
                 }
                 const [rows] = await connection.execute(query, params);
                 return rows;
+            }
+            catch (error) {
+                console.error("Error executing query:", error);
+                throw new Error("Failed to fetch events");
+            }
+            finally {
+                await connection.end();
+            }
+        },
+        eventsWithPagination: async (_, { startDate, endDate, dayOfWeek, timeOfDayBefore, timeOfDayAfter, tags, titleContains, venueContains, sort, limit, offset, }) => {
+            const connection = await connectToDatabase();
+            try {
+                let baseQuery = "FROM events WHERE 1=1";
+                const params = [];
+                if (titleContains) {
+                    baseQuery += " AND title LIKE ?";
+                    params.push(`%${titleContains}%`);
+                }
+                if (startDate) {
+                    baseQuery += " AND DATE(date_time) >= ?";
+                    params.push(startDate);
+                }
+                if (endDate) {
+                    baseQuery += " AND DATE(date_time) <= ?";
+                    params.push(endDate);
+                }
+                if (dayOfWeek) {
+                    baseQuery += " AND DAYNAME(date_time) = ?";
+                    params.push(dayOfWeek);
+                }
+                if (timeOfDayBefore) {
+                    baseQuery += " AND TIME(date_time) <= ?";
+                    params.push(timeOfDayBefore);
+                }
+                if (timeOfDayAfter) {
+                    baseQuery += " AND TIME(date_time) >= ?";
+                    params.push(timeOfDayAfter);
+                }
+                if (venueContains) {
+                    baseQuery += " AND venue LIKE ?";
+                    params.push(`%${venueContains}%`);
+                }
+                if (tags && tags.length > 0) {
+                    // Convert both database tags and input tags to lowercase for case-insensitive comparison
+                    const tagConditions = tags
+                        .map((tag) => `FIND_IN_SET(LOWER(?), LOWER(tags)) > 0`)
+                        .join(" OR ");
+                    baseQuery += ` AND (${tagConditions})`;
+                    params.push(...tags.map((tag) => tag.trim().toLowerCase())); // Lowercase and trim each tag
+                }
+                const validSortFields = ["date_time"];
+                if (sort && sort.field) {
+                    if (!validSortFields.includes(sort.field)) {
+                        throw new Error("Invalid sort field");
+                    }
+                    const sortOrder = sort.order && sort.order.toUpperCase() === "DESC" ? "DESC" : "ASC";
+                    baseQuery += ` ORDER BY ${mysql.escapeId(sort.field)} ${sortOrder}`;
+                }
+                let eventsQuery = `SELECT * ${baseQuery}`;
+                if (typeof limit === "number" && limit > 0) {
+                    eventsQuery += " LIMIT ?";
+                    params.push(`${limit}`);
+                }
+                if (typeof offset === "number" && offset > 0) {
+                    eventsQuery += " OFFSET ?";
+                    params.push(`${offset}`);
+                }
+                let countQuery = `SELECT COUNT(*) AS totalCount ${baseQuery}`;
+                const [eventRows] = await connection.execute(eventsQuery, params);
+                const [countRows] = await connection.execute(countQuery, params);
+                const totalCount = countRows[0]?.totalCount || 0;
+                return {
+                    events: eventRows,
+                    totalCount,
+                };
             }
             catch (error) {
                 console.error("Error executing query:", error);
