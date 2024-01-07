@@ -154,8 +154,12 @@ const resolvers = {
                 let baseQuery = "FROM events WHERE 1=1";
                 const params = [];
                 if (titleContains) {
-                    baseQuery += " AND title LIKE ?";
-                    params.push(`%${titleContains}%`);
+                    const searchTerms = titleContains
+                        .split(" ")
+                        .map((term) => `%${term}%`);
+                    const searchTermConditions = searchTerms.map((term) => "title LIKE ?");
+                    baseQuery += ` AND (${searchTermConditions.join(" AND ")})`;
+                    params.push(...searchTerms);
                 }
                 if (startDate) {
                     baseQuery += " AND DATE(date_time) >= ?";

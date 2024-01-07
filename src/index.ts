@@ -206,8 +206,14 @@ const resolvers = {
         const params = [];
 
         if (titleContains) {
-          baseQuery += " AND title LIKE ?";
-          params.push(`%${titleContains}%`);
+          const searchTerms = titleContains
+            .split(" ")
+            .map((term) => `%${term}%`);
+          const searchTermConditions = searchTerms.map(
+            (term) => "title LIKE ?"
+          );
+          baseQuery += ` AND (${searchTermConditions.join(" AND ")})`;
+          params.push(...searchTerms);
         }
 
         if (startDate) {
