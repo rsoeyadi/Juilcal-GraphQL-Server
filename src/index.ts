@@ -268,13 +268,13 @@ const resolvers = {
         }
 
         let eventsQuery = `SELECT * ${baseQuery}`;
+
         if (typeof limit === "number" && limit > 0) {
-          eventsQuery += " LIMIT ?";
-          params.push(`${limit}`);
+          eventsQuery += ` LIMIT ${limit}`;
         }
-        if (typeof offset === "number" && offset > 0) {
-          eventsQuery += " OFFSET ?";
-          params.push(`${offset}`);
+
+        if (typeof offset === "number" && offset >= 0) {
+          eventsQuery += ` OFFSET ${offset}`;
         }
 
         let countQuery = `SELECT COUNT(*) AS totalCount ${baseQuery}`;
